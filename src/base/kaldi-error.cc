@@ -31,6 +31,7 @@
 
 #include "base/kaldi-common.h"
 #include "base/kaldi-error.h"
+#include "base/version.h"
 
 namespace kaldi {
 
@@ -40,13 +41,12 @@ int32 g_kaldi_verbose_level = 0;
 const char *g_program_name = NULL;
 static LogHandler g_log_handler = NULL;
 
-// If the program name was set (g_program_name != ""), the function
-// GetProgramName returns the program name (without the path) followed by a
-// colon, e.g. "gmm-align:".  Otherwise it returns the empty string "".
+// If the program name was set (g_program_name != ""), GetProgramName
+// returns the program name (without the path), e.g. "gmm-align".
+// Otherwise it returns the empty string "".
 const char *GetProgramName() {
   return g_program_name == NULL ? "" : g_program_name;
 }
-
 
 /***** HELPER FUNCTIONS *****/
 
@@ -147,14 +147,18 @@ MessageLogger::MessageLogger(LogMessageEnvelope::Severity severity,
 }
 
 
-MessageLogger::~MessageLogger() KALDI_NOEXCEPT(false) {
+MessageLogger::~MessageLogger() noexcept(false) {
+  std::string str = GetMessage();
+  // print the mesage (or send to logging handler),
+  MessageLogger::HandleMessage(envelope_, str.c_str());
+}
+
+std::string MessageLogger::GetMessage() const {
   // remove trailing '\n',
   std::string str = ss_.str();
   while (!str.empty() && str[str.length() - 1] == '\n')
     str.resize(str.length() - 1);
-
-  // print the mesage (or send to logging handler),
-  MessageLogger::HandleMessage(envelope_, str.c_str());
+  return str;
 }
 
 
@@ -184,12 +188,13 @@ void MessageLogger::HandleMessage(const LogMessageEnvelope &envelope,
           header << "ASSERTION_FAILED (";
           break;
         default:
-          abort();  // coding errror (unknown 'severity'),
+          abort();  // coding error (unknown 'severity'),
       }
     }
     // fill the other info from the envelope,
-    header << GetProgramName() << envelope.func << "():"
-           << envelope.file << ':' << envelope.line << ")";
+    header << GetProgramName() << "[" KALDI_VERSION "]" << ':'
+           << envelope.func << "():" << envelope.file << ':' << envelope.line
+           << ")";
 
     // Printing the message,
     if (envelope.severity >= LogMessageEnvelope::kWarning) {
@@ -201,9 +206,33 @@ void MessageLogger::HandleMessage(const LogMessageEnvelope &envelope,
               KaldiGetStackTrace().c_str());
     }
   }
+}
+
+FatalMessageLogger::FatalMessageLogger(LogMessageEnvelope::Severity severity,
+                                       const char *func, const char *file,
+                                       int32 line):
+  MessageLogger(severity, func, file, line) {
+  if (severity != LogMessageEnvelope::kAssertFailed &&
+      severity != LogMessageEnvelope::kError) {
+    // Don't use KALDI_ERR, since that will recursively instantiate
+    // MessageLogger.
+    throw std::runtime_error("FatalMessageLogger should be called only with "
+                             "severities kAssertFailed and kError");
+  }
+}
+#if defined(_MSC_VER)
+FatalMessageLogger::~FatalMessageLogger [[ noreturn ]] () noexcept(false)
+#else
+[[ noreturn ]] FatalMessageLogger::~FatalMessageLogger() noexcept(false)
+#endif
+{
+  std::string str = GetMessage();
+
+  // print the mesage (or send to logging handler),
+  MessageLogger::HandleMessage(envelope_, str.c_str());
 
   // Should we throw exception, or abort?
-  switch (envelope.severity) {
+  switch (envelope_.severity) {
     case LogMessageEnvelope::kAssertFailed:
       abort(); // ASSERT_FAILED,
       break;
@@ -220,6 +249,10 @@ void MessageLogger::HandleMessage(const LogMessageEnvelope &envelope,
         abort();
       }
       break;
+  default: // This should never happen, based on constructor's
+           // preconditions. But we place abort() here so that all
+           // possible pathways through this function do not return.
+    abort();
   }
 }
 
@@ -228,7 +261,7 @@ void MessageLogger::HandleMessage(const LogMessageEnvelope &envelope,
 
 void KaldiAssertFailure_(const char *func, const char *file,
                          int32 line, const char *cond_str) {
-  MessageLogger ml(LogMessageEnvelope::kAssertFailed, func, file, line);
+  FatalMessageLogger ml(LogMessageEnvelope::kAssertFailed, func, file, line);
   ml.stream() << ": '" << cond_str << "' ";
 }
 

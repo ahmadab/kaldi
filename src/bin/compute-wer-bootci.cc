@@ -116,10 +116,10 @@ void GetBootstrapWERInterval(
       BaseFloat *mean, BaseFloat *interval) {
     BaseFloat wer_accum = 0.0, wer_mult_accum = 0.0;
 
-    for (int32 i = 0; i <= replications; ++i) {
+    for (int32 i = 0; i < replications; ++i) {
       int32 num_words = 0, word_errs = 0;
-      for (int32 j = 0; j <= edit_word_per_hyp.size(); ++j) {
-        int32 random_pos = kaldi::RandInt(0, edit_word_per_hyp.size());
+      for (int32 j = 0; j < edit_word_per_hyp.size(); ++j) {
+        int32 random_pos = kaldi::RandInt(0, edit_word_per_hyp.size() - 1);
         word_errs += edit_word_per_hyp[random_pos].first;
         num_words += edit_word_per_hyp[random_pos].second;
         }
@@ -140,10 +140,10 @@ void GetBootstrapWERTwoSystemComparison(
       int32 replications, BaseFloat *p_improv) {
     int32 improv_accum = 0.0;
 
-    for (int32 i = 0; i <= replications; ++i) {
+    for (int32 i = 0; i < replications; ++i) {
       int32 word_errs = 0;
-      for (int32 j = 0; j <= edit_word_per_hyp.size(); ++j) {
-        int32 random_pos = kaldi::RandInt(0, edit_word_per_hyp.size());
+      for (int32 j = 0; j < edit_word_per_hyp.size(); ++j) {
+        int32 random_pos = kaldi::RandInt(0, edit_word_per_hyp.size() - 1);
         word_errs += edit_word_per_hyp[random_pos].first -
                         edit_word_per_hyp2[random_pos].first;
         }
@@ -165,7 +165,7 @@ int main(int argc, char *argv[]) {
       "Compute a bootstrapping of WER to extract the 95\% confidence interval.\n"
       "Take a reference and a transcription file, in integer or text format,\n"
       "and outputs overall WER statistics to standard output along with its\n"
-      "confidence interval using the bootstrap methos of Bisani and Ney.\n"
+      "confidence interval using the bootstrap method of Bisani and Ney.\n"
       "If a second transcription file corresponding to the same reference is\n"
       "provided, a bootstrap comparison of the two transcription is performed\n"
       "to estimate the probability of improvement.\n"

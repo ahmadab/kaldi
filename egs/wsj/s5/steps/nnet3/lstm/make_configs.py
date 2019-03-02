@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+# This script is deprecated, please use ../xconfig_to_configs.py
+
 from __future__ import print_function
 import os
 import argparse
@@ -9,8 +11,8 @@ import copy
 import imp
 
 nodes = imp.load_source('nodes', 'steps/nnet3/components.py')
-nnet3_train_lib = imp.load_source('ntl', 'steps/nnet3/nnet3_train_lib.py')
-chain_lib = imp.load_source('ncl', 'steps/nnet3/chain/nnet3_chain_lib.py')
+sys.path.insert(0, 'steps')
+import libs.common as common_lib
 
 def GetArgs():
     # we add compulsary arguments as named arguments for readability
@@ -48,7 +50,7 @@ def GetArgs():
                         help="For chain models, if nonzero, add a separate output for cross-entropy "
                         "regularization (with learning-rate-factor equal to the inverse of this)",
                         default=0.0)
-    parser.add_argument("--include-log-softmax", type=str, action=nnet3_train_lib.StrToBoolAction,
+    parser.add_argument("--include-log-softmax", type=str, action=common_lib.StrToBoolAction,
                         help="add the final softmax layer ", default=True, choices = ["false", "true"])
     parser.add_argument("--max-change-per-component", type=float,
                         help="Enforces per-component max change (except for the final affine layer). "
@@ -76,7 +78,7 @@ def GetArgs():
                         help="options to be supplied to NaturalGradientAffineComponent", default="")
 
     # Gradient clipper options
-    parser.add_argument("--norm-based-clipping", type=str, action=nnet3_train_lib.StrToBoolAction,
+    parser.add_argument("--norm-based-clipping", type=str, action=common_lib.StrToBoolAction,
                         help="Outdated option retained for back compatibility, has no effect.",
                         default=True, choices = ["false", "true"])
     parser.add_argument("--clipping-threshold", type=float,
@@ -84,7 +86,7 @@ def GetArgs():
                         "if clipping-threshold=0 no clipping is done", default=30)
     parser.add_argument("--zeroing-threshold", type=float,
                         help="zeroing threshold used in BackpropTruncation components, "
-                        "if zeroing-threshold=0 no periodic zeroing is done", default=3.0)
+                        "if zeroing-threshold=0 no periodic zeroing is done", default=15.0)
     parser.add_argument("--zeroing-interval", type=int,
                         help="zeroing interval used in BackpropTruncation components", default=20)
     parser.add_argument("--self-repair-scale-nonlinearity", type=float,
@@ -116,15 +118,15 @@ def CheckArgs(args):
 
     ## Check arguments.
     if args.feat_dir is not None:
-        args.feat_dim = nnet3_train_lib.GetFeatDim(args.feat_dir)
+        args.feat_dim = common_lib.get_feat_dim(args.feat_dir)
 
     if args.ali_dir is not None:
-        args.num_targets = nnet3_train_lib.GetNumberOfLeaves(args.ali_dir)
+        args.num_targets = common_lib.get_number_of_leaves_from_tree(args.ali_dir)
     elif args.tree_dir is not None:
-        args.num_targets = chain_lib.GetNumberOfLeaves(args.tree_dir)
+        args.num_targets = common_lib.get_number_of_leaves_from_tree(args.tree_dir)
 
     if args.ivector_dir is not None:
-        args.ivector_dim = nnet3_train_lib.GetIvectorDim(args.ivector_dir)
+        args.ivector_dim = common_lib.get_ivector_dim(args.ivector_dir)
 
     if not args.feat_dim > 0:
         raise Exception("feat-dim has to be postive")
@@ -179,7 +181,7 @@ def ParseSpliceString(splice_indexes, label_delay=None):
     splice_array = []
     try:
         for i in range(len(split1)):
-            indexes = map(lambda x: int(x), split1[i].strip().split(","))
+            indexes = [int(x) for x in split1[i].strip().split(",")]
             print(indexes)
             if len(indexes) < 1:
                 raise ValueError("invalid --splice-indexes argument, too-short element: "
@@ -212,12 +214,12 @@ def ParseLstmDelayString(lstm_delay):
     lstm_delay_array = []
     try:
         for i in range(len(split1)):
-            indexes = map(lambda x: int(x), split1[i].strip().lstrip('[').rstrip(']').strip().split(","))
+            indexes = [int(x) for x in split1[i].strip().lstrip('[').rstrip(']').strip().split(",")]
             if len(indexes) < 1:
                 raise ValueError("invalid --lstm-delay argument, too-short element: "
                                 + lstm_delay)
             elif len(indexes) == 2 and indexes[0] * indexes[1] >= 0:
-                raise ValueError('Warning: ' + str(indexes) + ' is not a standard BLSTM mode. There should be a negative delay for the forward, and a postive delay for the backward.')
+                raise ValueError('Warning: {} is not a standard BLSTM mode. There should be a negative delay for the forward, and a postive delay for the backward.'.format(indexes))
             if len(indexes) == 2 and indexes[0] > 0: # always a negative delay followed by a postive delay
                 indexes[0], indexes[1] = indexes[1], indexes[0]
             lstm_delay_array.append(indexes)
@@ -333,9 +335,9 @@ def ProcessSpliceIndexes(config_dir, splice_indexes, label_delay, num_lstm_layer
 
     # write the files used by other scripts like steps/nnet3/get_egs.sh
     f = open(config_dir + "/vars", "w")
-    print('model_left_context=' + str(left_context), file=f)
-    print('model_right_context=' + str(right_context), file=f)
-    print('num_hidden_layers=' + str(num_hidden_layers), file=f)
+    print('model_left_context={}'.format(left_context), file=f)
+    print('model_right_context={}'.format(right_context), file=f)
+    print('num_hidden_layers={}'.format(num_hidden_layers), file=f)
     # print('initial_right_context=' + str(splice_array[0][-1]), file=f)
     f.close()
 

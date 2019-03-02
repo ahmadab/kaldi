@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# Note: this file is part of some nnet3 config-creation tools that are now deprecated.
 
 from __future__ import print_function
 import os
@@ -83,7 +84,7 @@ def AddBlockAffineLayer(config_lines, name, input, output_dim, num_blocks):
 def AddPermuteLayer(config_lines, name, input, column_map):
     components = config_lines['components']
     component_nodes = config_lines['component-nodes']
-    permute_indexes = ",".join(map(lambda x: str(x), column_map))
+    permute_indexes = ",".join([str(x) for x in column_map])
     components.append('component name={0}_permute type=PermuteComponent column-map={1}'.format(name, permute_indexes))
     component_nodes.append('component-node name={0}_permute component={0}_permute input={1}'.format(name, input['descriptor']))
 
@@ -96,7 +97,7 @@ def AddAffineLayer(config_lines, name, input, output_dim, ng_affine_options = ""
 
     # Per-component max-change option
     max_change_options = "max-change={0:.2f}".format(max_change_per_component) if max_change_per_component is not None else ''
- 
+
     components.append("component name={0}_affine type=NaturalGradientAffineComponent input-dim={1} output-dim={2} {3} {4}".format(name, input['dimension'], output_dim, ng_affine_options, max_change_options))
     component_nodes.append("component-node name={0}_affine component={0}_affine input={1}".format(name, input['descriptor']))
 
@@ -111,7 +112,7 @@ def AddAffRelNormLayer(config_lines, name, input, output_dim, ng_affine_options 
     self_repair_string = "self-repair-scale={0:.10f}".format(self_repair_scale) if self_repair_scale is not None else ''
     # Per-component max-change option
     max_change_options = "max-change={0:.2f}".format(max_change_per_component) if max_change_per_component is not None else ''
- 
+
     components.append("component name={0}_affine type=NaturalGradientAffineComponent input-dim={1} output-dim={2} {3} {4}".format(name, input['dimension'], output_dim, ng_affine_options, max_change_options))
     components.append("component name={0}_relu type=RectifiedLinearComponent dim={1} {2}".format(name, output_dim, self_repair_string))
     components.append("component name={0}_renorm type=NormalizeComponent dim={1} target-rms={2}".format(name, output_dim, norm_target_rms))
@@ -167,8 +168,8 @@ def AddConvolutionLayer(config_lines, name, input,
     components.append(conv_init_string)
     component_nodes.append("component-node name={0}_conv_t component={0}_conv input={1}".format(name, input['descriptor']))
 
-    num_x_steps = (1 + (input_x_dim - filt_x_dim) / filt_x_step)
-    num_y_steps = (1 + (input_y_dim - filt_y_dim) / filt_y_step)
+    num_x_steps = (1 + (input_x_dim - filt_x_dim) // filt_x_step)
+    num_y_steps = (1 + (input_y_dim - filt_y_dim) // filt_y_step)
     output_dim = num_x_steps * num_y_steps * num_filters;
     return {'descriptor':  '{0}_conv_t'.format(name),
             'dimension': output_dim,
@@ -203,9 +204,9 @@ def AddMaxpoolingLayer(config_lines, name, input,
 
     component_nodes.append('component-node name={0}_maxp_t component={0}_maxp input={1}'.format(name, input['descriptor']))
 
-    num_pools_x = 1 + (input_x_dim - pool_x_size) / pool_x_step;
-    num_pools_y = 1 + (input_y_dim - pool_y_size) / pool_y_step;
-    num_pools_z = 1 + (input_z_dim - pool_z_size) / pool_z_step;
+    num_pools_x = 1 + (input_x_dim - pool_x_size) // pool_x_step;
+    num_pools_y = 1 + (input_y_dim - pool_y_size) // pool_y_step;
+    num_pools_z = 1 + (input_z_dim - pool_z_size) // pool_z_step;
     output_dim = num_pools_x * num_pools_y * num_pools_z;
 
     return {'descriptor':  '{0}_maxp_t'.format(name),
@@ -289,8 +290,8 @@ def AddLstmLayer(config_lines,
                  name, input, cell_dim,
                  recurrent_projection_dim = 0,
                  non_recurrent_projection_dim = 0,
-                 clipping_threshold = 1.0,
-                 zeroing_threshold = 3.0,
+                 clipping_threshold = 30.0,
+                 zeroing_threshold = 15.0,
                  zeroing_interval = 20,
                  ng_per_element_scale_options = "",
                  ng_affine_options = "",
@@ -484,4 +485,4 @@ def AddBLstmLayer(config_lines,
             'descriptor': output_descriptor,
             'dimension':output_dim
             }
- 
+
